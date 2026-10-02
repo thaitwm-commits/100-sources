@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>100 sources</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font:14px/1.45 system-ui,Segoe UI,Arial,sans-serif;color:#1a1a1a;background:#fff}
+header{position:sticky;top:0;z-index:2;background:#f2f2f2;border-bottom:1px solid #bbb;padding:8px 14px;display:flex;flex-wrap:wrap;gap:6px 22px;align-items:baseline}
+header b{font-size:16px}
+#prog{font-size:18px;font-weight:700}
+main{max-width:1400px;margin:0 auto;padding:12px 14px 40px}
+h2{font-size:14px;margin:18px 0 6px}
+.note{color:#555;font-size:13px;margin:0 0 6px}
+code{background:#eee;padding:1px 4px}
+textarea{width:100%;height:84px;font:13px/1.4 Consolas,monospace;padding:6px;border:1px solid #888}
+table{width:100%;border-collapse:collapse}
+th,td{border:1px solid #ccc;padding:2px 4px;text-align:left;vertical-align:middle}
+th{background:#f2f2f2;font-weight:600}
+td input{width:100%;border:0;padding:5px 4px;font:inherit;background:transparent}
+td input:focus{outline:2px solid #2060c0;outline-offset:-2px}
+.n{width:32px;text-align:right;color:#666}
+.s{width:20%;font-size:13px}
+.b{width:54px}
+tr.e td.s{color:#b00020;font-weight:600}
+tr.e td{background:#fdecee}
+tr.o td.s{color:#1a7f37}
+tr.w td.s{color:#8a5a00}
+input.doi{background:#fff176}
+button{font:inherit;padding:5px 12px;border:1px solid #666;background:#eee;cursor:pointer}
+button:disabled{opacity:.5;cursor:default}
+button.p{background:#1f4fa0;color:#fff;border-color:#1f4fa0}
+.bar{display:flex;gap:14px;align-items:center;margin:8px 0}
+#cfg{display:none;background:#fff3a3;border:1px solid #c9a800;padding:8px;margin-bottom:10px}
+#gate{max-width:420px;margin:70px auto;padding:0 14px}
+#gate input{width:100%;padding:8px;font:inherit;border:1px solid #888;margin:8px 0}
+#q{width:260px;padding:5px;border:1px solid #888;font:inherit}
+.mut{color:#666;font-size:13px}
+a{color:#1f4fa0}
+.top{display:flex;gap:18px;align-items:flex-start}
+.top>.m1{flex:1;min-width:0}
+#rank{width:230px;flex:none}
+@media(max-width:700px){.top{flex-direction:column}.top>.m1,#rank{width:100%}}
+</style>
+</head>
+<body>
+
+<script>
+/* ===== CẤU HÌNH: điền các giá trị trong ngoặc kép ===== */
+const CFG = {
+  FORM_URL: "https://docs.google.com/forms/d/e/1FAIpQLScmY5fwnVxQOjfLOIe0LbOwd2qoXCNqPrvrgl4jWYiMeUOe3A/formResponse",
+  CSV_URL:  "https://docs.google.com/spreadsheets/d/e/2PACX-1vQIGaHC_vJ1jqh4z1rSm97KcOarWsrzuKyOf4cDRcbqjafsYP4WutEE4icSyZ6HODVUIiKSC3GQiRUl/pub?output=csv",
+  ENTRY: { link: "entry.601429750", title: "entry.1709423100", link2: "entry.677628333", title2: "entry.1760357078", user: "entry.895730789" },
+  COL:   { time: 0, link: 1, title: 2, link2: 3, title2: 4, user: 5 },  /* thứ tự cột trong Sheet, bắt đầu từ 0 */
+  REQUIRE_TRANS: true,   /* true: bắt buộc có link và tên bản dịch mới được gửi */
+  TARGET: 100, MIN_ROWS: 10, REFRESH_MS: 60000
+};
+/* ====================================================== */
+</script>
+
+<div id="gate" hidden>
+  <b>Nhập tên của bạn</b>
+  <p class="note">Tên này được ghi vào Sheet cho mỗi bài bạn nhập (người lấy link đầu tiên) và được nhớ trên trình duyệt này.</p>
+  <input id="nm" placeholder="Ví dụ: Nguyễn Văn A" autocomplete="off">
+  <button class="p" id="nmok">Lưu tên</button>
+</div>
+
+<div id="app" hidden>
+<header>
+  <b>Kiểm tra trùng nguồn</b>
+  <span>Đã có: <span id="prog">0 / 0</span></span>
+  <span>Của bạn: <span id="mine">0</span></span>
+  <span class="mut" id="conn">Đang tải...</span>
+  <span>Người nhập: <b id="who"></b> <a href="#" id="chg">đổi tên</a></span>
+</header>
+<main>
+  <div id="cfg">Chưa cấu hình. Mở file bằng Notepad, điền FORM_URL, CSV_URL và các mã entry ở đầu file.</div>
+
+  <div class="top"><div class="m1">
+  <h2>Nhập hàng loạt</h2>
+  <p class="note">Mỗi bài gồm 4 phần theo thứ tự: <code>link bài gốc, tên bài gốc, link bản dịch, tên bản dịch</code>. Các phần cách nhau bằng dấu phẩy hoặc khoảng trắng; trang tự nhận từng phần dựa vào link (bắt đầu bằng http), nên tên bài được phép có dấu phẩy. Mỗi bài một dòng, hoặc nhiều bài viết liền nhau. Dán xong, bấm "Nhập xuống" (hoặc Ctrl+Enter) để chuyển xuống bảng bên dưới; chưa bấm thì chưa có gì thay đổi.</p>
+  <textarea id="bulk" spellcheck="false" placeholder="https://a.com/bai-1, Tên bài gốc 1, https://b.com/bai-1, Tên bản dịch 1&#10;https://a.com/bai-2, Tên bài gốc 2, https://b.com/bai-2, Tên bản dịch 2"></textarea>
+  <div class="bar"><button class="p" id="down">Nhập xuống</button><span class="mut" id="moved"></span></div>
+  </div>
+  <div id="rank">
+    <h2>Xếp hạng</h2>
+    <table><thead><tr><th class="n">#</th><th>Người nhập</th><th class="n">Bài</th></tr></thead><tbody></tbody></table>
+  </div></div>
+
+  <h2>Các hàng chờ gửi</h2>
+  <table>
+    <thead><tr><th class="n">#</th><th>Link bài gốc</th><th>Tên bài gốc</th><th>Link bản dịch</th><th>Tên bản dịch</th><th class="s">Kiểm tra</th><th class="b"></th></tr></thead>
+    <tbody id="grid"></tbody>
+  </table>
+  <div class="bar">
+    <button class="p" id="send" disabled>Gửi 0 hàng hợp lệ</button>
+    <span class="mut" id="sum"></span>
+  </div>
+
+  <h2>Danh sách chung</h2>
+  <input id="q" placeholder="Lọc theo tên bài, link, người nhập">
+  <table style="margin-top:6px">
+    <thead><tr><th class="n">#</th><th>Tên bài gốc</th><th>Link bài gốc</th><th>Tên bản dịch</th><th>Link bản dịch</th><th>Người nhập đầu tiên</th><th>Thời gian</th></tr></thead>
+    <tbody id="list"></tbody>
+  </table>
+</main>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const E = CFG.ENTRY, C = CFG.COL, KEYS = ["l", "t", "l2", "t2"];
+let name = "", sheet = [], local = [], all = [], rows = [];
+try { name = localStorage.getItem("nguoi_nhap") || ""; } catch (e) {}
+
+/* ---------- chuẩn hóa ---------- */
+const TRACK = /^(utm_|fbclid|gclid|mc_|igshid|spm|ref$|source$)/i;
+function nurl(u) {
+  try {
+    const x = new URL(u.trim());
+    const h = x.hostname.toLowerCase().replace(/^(www|m|amp)\./, "");
+    const p = [...x.searchParams].filter(([k]) => !TRACK.test(k)).sort().map(([k, v]) => k + "=" + v).join("&");
+    return h + x.pathname.replace(/\/+$/, "").toLowerCase() + (p ? "?" + p : "");
+  } catch (e) { return u.trim().toLowerCase(); }
+}
+const ntitle = s => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/gi, "d").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+const doiOf = u => { const m = u.match(/10\.\d{4,9}\/[^\s?#,]+/i); return m ? m[0].replace(/[.,;)]+$/, "").toLowerCase() : ""; };
+const urlsIn = s => s.match(/https?:\/\/[^\s,|;]+/g) || [];
+const rec = (l, t, u, time, l2, t2) => ({ l, t, user: u, time, l2: l2 || "", t2: t2 || "", nl: nurl(l), d: doiOf(l), nl2: l2 ? nurl(l2) : "", d2: l2 ? doiOf(l2) : "", nt: ntitle(t || "") });
+
+function parseCSV(t) {
+  const r = []; let row = [], c = "", q = false;
+  for (let i = 0; i < t.length; i++) {
+    const ch = t[i];
+    if (q) { if (ch === '"') { if (t[i + 1] === '"') { c += '"'; i++; } else q = false; } else c += ch; }
+    else if (ch === '"') q = true;
+    else if (ch === ",") { row.push(c); c = ""; }
+    else if (ch === "\n" || ch === "\r") { if (ch === "\r" && t[i + 1] === "\n") i++; row.push(c); r.push(row); row = []; c = ""; }
+    else c += ch;
+  }
+  if (c || row.length) { row.push(c); r.push(row); }
+  return r;
+}
+
+/* ---------- dữ liệu Sheet ---------- */
+function rebuild() {
+  const have = new Set(sheet.map(r => r.nl));
+  all = sheet.concat(local.filter(r => !have.has(r.nl)));
+}
+const findLink = (nl, d) => all.find(r => r.nl === nl || r.nl2 === nl || (d && (r.d === d || r.d2 === d)));
+const role = (r, n, d) => (r.nl === n || (d && r.d === d)) ? "bài gốc" : "bản dịch";
+const findTitle = nt => nt && all.find(r => r.nt && (r.nt === nt || (Math.min(r.nt.length, nt.length) >= 20 && (r.nt.includes(nt) || nt.includes(r.nt)))));
+
+async function load() {
+  if (/^DAN_/.test(CFG.CSV_URL)) { $("cfg").style.display = "block"; $("conn").textContent = "Chưa cấu hình"; return; }
+  try {
+    const u = CFG.CSV_URL + (CFG.CSV_URL.includes("?") ? "&" : "?") + "t=" + Date.now();
+    const rs = parseCSV(await (await fetch(u)).text()).slice(1).filter(r => r[C.link]);
+    sheet = rs.map(r => rec(r[C.link], r[C.title], r[C.user], r[C.time], r[C.link2], r[C.title2]));
+    $("conn").textContent = "Đồng bộ lúc " + new Date().toLocaleTimeString("vi-VN");
+  } catch (e) { $("conn").textContent = "Không đọc được Sheet (kiểm tra CSV_URL)"; }
+  rebuild(); validate(); renderList();
+}
+
+/* ---------- bảng hàng ---------- */
+const filled = r => KEYS.some(k => r[k].value.trim());
+function addRow() {
+  const tr = document.createElement("tr");
+  tr.innerHTML = '<td class="n"></td><td><input class="l" placeholder="link bài gốc"></td><td><input class="t" placeholder="tên bài gốc"></td><td><input class="l2" placeholder="link bản dịch"></td><td><input class="t2" placeholder="tên bản dịch"></td><td class="s"></td><td class="b"><button>Xóa</button></td>';
+  const r = { tr, n: tr.children[0], s: tr.querySelector(".s") };
+  KEYS.forEach(k => r[k] = tr.querySelector("." + k));
+  [["l", "t"], ["l2", "t2"]].forEach(([lk, tk]) => {
+    let tm;
+    r[lk].addEventListener("input", () => { validate(); clearTimeout(tm); tm = setTimeout(() => doiFill(r, lk, tk), 400); });
+    r[tk].addEventListener("input", () => { r[tk].classList.remove("doi"); delete r[tk].dataset.auto; validate(); });
+    r[tk].addEventListener("blur", () => r[tk].classList.remove("doi"));
+  });
+  tr.querySelector("button").onclick = () => del(r);
+  rows.push(r); $("grid").appendChild(tr);
+  return r;
+}
+function del(r) {
+  if (rows.length > CFG.MIN_ROWS) { rows.splice(rows.indexOf(r), 1); r.tr.remove(); }
+  else KEYS.forEach(k => { r[k].value = ""; r[k].classList.remove("doi"); delete r[k].dataset.auto; delete r[k].dataset.d; });
+  validate();
+}
+function put(o) {
+  const r = rows.find(x => !filled(x)) || addRow();
+  KEYS.forEach(k => r[k].value = o[k] || "");
+  doiFill(r, "l", "t"); doiFill(r, "l2", "t2");
+}
+
+async function doiFill(r, lk, tk) {
+  const T = r[tk], d = doiOf(r[lk].value);
+  if (!d || (T.value.trim() && !T.dataset.auto) || T.dataset.d === d) return;
+  T.dataset.d = d; r.s.textContent = "Đang lấy tên bài từ DOI...";
+  try {
+    const j = await (await fetch("https://api.crossref.org/works/" + encodeURI(d))).json();
+    const t = ((j.message || {}).title || [])[0];
+    if (t) { T.value = t.replace(/<[^>]+>/g, ""); T.dataset.auto = 1; T.classList.add("doi"); }
+  } catch (e) {}
+  validate();
+}
+
+function validate() {
+  const sl = new Map(), st = new Map(); let ok = 0;
+  const hit = (n, d) => sl.get(n) || (d && sl.get("d:" + d));
+  rows.forEach((r, i) => {
+    r.n.textContent = i + 1;
+    const l = r.l.value.trim(), t = r.t.value.trim(), l2 = r.l2.value.trim(), t2 = r.t2.value.trim();
+    let m = "", c = "";
+    if (l || t || l2 || t2) {
+      const us = urlsIn(l), us2 = urlsIn(l2);
+      if (us.length > 1 || us2.length > 1) { m = "Lỗi: nhiều link trong 1 ô. Tách mỗi link một ô."; c = "e"; }
+      else if (!us.length) { m = "Lỗi: chưa có link bài gốc hợp lệ (phải bắt đầu bằng http)."; c = "e"; }
+      else if (l2 && !us2.length) { m = "Lỗi: link bản dịch không hợp lệ."; c = "e"; }
+      else {
+        const nl = nurl(us[0]), d = doiOf(us[0]), nt = ntitle(t);
+        const nl2 = us2.length ? nurl(us2[0]) : "", d2 = us2.length ? doiOf(us2[0]) : "";
+        const a = findLink(nl, d), a2 = nl2 && findLink(nl2, d2), b = findTitle(nt);
+        if (a) { m = "Trùng link: " + a.user + " đã nhập link này làm " + role(a, nl, d) + " (" + a.time + "). Kiểm tra lại."; c = "e"; }
+        else if (nl2 && (nl2 === nl || (d && d === d2))) { m = "Link bản dịch trùng link bài gốc trong cùng hàng. Kiểm tra có bị lộn không."; c = "e"; }
+        else if (a2) { m = "Link bản dịch trùng: " + a2.user + " đã nhập link này làm " + role(a2, nl2, d2) + " (" + a2.time + "). Kiểm tra lại."; c = "e"; }
+        else if (hit(nl, d)) { m = "Trùng link với hàng " + hit(nl, d) + " trong bảng (kể cả link bản dịch)."; c = "e"; }
+        else if (nl2 && hit(nl2, d2)) { m = "Link bản dịch trùng link ở hàng " + hit(nl2, d2) + " (có thể bị lộn gốc và dịch)."; c = "e"; }
+        else if (!t) { m = "Thiếu tên bài gốc."; c = "w"; }
+        else if (b) { m = "Trùng tên bài: đã có người nhập (" + b.user + ")."; c = "e"; }
+        else if (st.has(nt)) { m = "Trùng tên bài với hàng " + st.get(nt) + "."; c = "e"; }
+        else if (CFG.REQUIRE_TRANS && !us2.length) { m = "Thiếu link bản dịch."; c = "w"; }
+        else if (CFG.REQUIRE_TRANS && !t2) { m = "Thiếu tên bản dịch."; c = "w"; }
+        else { m = "Hợp lệ"; c = "o"; ok++; }
+        sl.set(nl, i + 1); if (d) sl.set("d:" + d, i + 1); if (nt) st.set(nt, i + 1);
+        if (nl2) { sl.set(nl2, i + 1); if (d2) sl.set("d:" + d2, i + 1); }
+      }
+    }
+    r.s.textContent = m; r.tr.className = c;
+  });
+  while (rows.every(filled)) addRow();
+  $("send").textContent = "Gửi " + ok + " hàng hợp lệ";
+  $("send").disabled = !ok || !name;
+  const bad = rows.filter(r => r.tr.className === "e").length;
+  $("sum").textContent = bad ? bad + " hàng lỗi, cần sửa hoặc xóa" : "";
+  progress();
+}
+
+/* ---------- nhập hàng loạt: tách theo link ---------- */
+const TRIM = /^[\s,|;:\-–]+|[\s,|;]+$/g;
+function parseLine(L) {
+  const re = /https?:\/\/[^\s,|;]+/g, idx = []; let m;
+  while ((m = re.exec(L))) idx.push({ u: m[0].replace(/[.)\]]+$/, ""), s: m.index, e: m.index + m[0].length });
+  if (!idx.length) return [{ l: L }];
+  const pre = L.slice(0, idx[0].s).replace(TRIM, "");
+  const segs = idx.map((x, i) => ({ u: x.u, t: L.slice(x.e, i + 1 < idx.length ? idx[i + 1].s : L.length).replace(TRIM, "") }));
+  if (pre && !segs[0].t) segs[0].t = pre;
+  const out = [];
+  for (let i = 0; i < segs.length; i += 2) {
+    const a = segs[i], b = segs[i + 1] || { u: "", t: "" };
+    out.push({ l: a.u, t: a.t, l2: b.u, t2: b.t });
+  }
+  return out;
+}
+function ingest() {
+  const b = $("bulk"); let n = 0;
+  b.value.split(/\r?\n/).forEach(L => { L = L.trim(); if (L) parseLine(L).forEach(o => { put(o); n++; }); });
+  b.value = ""; validate();
+  $("moved").textContent = n ? "Đã chuyển " + n + " bài xuống bảng." : "Không có gì để nhập.";
+}
+$("down").onclick = ingest;
+$("bulk").addEventListener("keydown", e => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) ingest(); });
+
+/* ---------- gửi ---------- */
+$("send").onclick = async () => {
+  if (/^DAN_/.test(CFG.FORM_URL)) { $("cfg").style.display = "block"; return; }
+  const good = rows.filter(r => r.tr.className === "o");
+  $("send").disabled = true;
+  for (const r of good) {
+    const l = urlsIn(r.l.value)[0], t = r.t.value.trim(), l2 = urlsIn(r.l2.value)[0] || "", t2 = r.t2.value.trim();
+    const b = new URLSearchParams();
+    b.set(E.link, l); b.set(E.title, t); b.set(E.link2, l2); b.set(E.title2, t2); b.set(E.user, name);
+    r.s.textContent = "Đang gửi...";
+    try {
+      await fetch(CFG.FORM_URL, { method: "POST", mode: "no-cors", body: b });
+      local.push(rec(l, t, name, new Date().toLocaleString("vi-VN"), l2, t2));
+      rebuild(); del(r);
+    } catch (e) { r.s.textContent = "Gửi lỗi, thử lại."; r.tr.className = "e"; }
+  }
+  rebuild(); validate(); renderList();
+};
+
+/* ---------- tiến độ, xếp hạng, danh sách ---------- */
+function renderRank() {
+  const m = new Map();
+  all.forEach(r => {
+    const u = (r.user || "").trim(), k = u.toLowerCase(); if (!k) return;
+    const e = m.get(k) || { n: u, c: 0 }; e.c++; m.set(k, e);
+  });
+  const tb = $("rank").querySelector("tbody"); tb.innerHTML = "";
+  [...m.values()].sort((a, b) => b.c - a.c || a.n.localeCompare(b.n)).forEach((e, i) => {
+    const tr = document.createElement("tr");
+    if (e.n.toLowerCase() === name.trim().toLowerCase()) tr.style.fontWeight = "700";
+    [i + 1, e.n, e.c].forEach((v, k) => {
+      const td = document.createElement("td"); td.textContent = v;
+      if (k !== 1) td.className = "n"; tr.appendChild(td);
+    });
+    tb.appendChild(tr);
+  });
+}
+function progress() {
+  renderRank();
+  $("prog").textContent = all.length + " / " + CFG.TARGET;
+  $("mine").textContent = all.filter(r => (r.user || "").trim().toLowerCase() === name.trim().toLowerCase()).length;
+}
+function renderList() {
+  const q = ntitle($("q").value), tb = $("list"); tb.innerHTML = "";
+  all.forEach((r, i) => {
+    if (q && !ntitle([r.t, r.l, r.t2, r.l2, r.user].join(" ")).includes(q)) return;
+    const tr = document.createElement("tr");
+    [i + 1, r.t, r.l, r.t2, r.l2, r.user, r.time].forEach((v, k) => {
+      const td = document.createElement("td"); v = v || "";
+      if (k === 0) td.className = "n";
+      if ((k === 2 || k === 4) && /^https?:\/\//.test(v)) {
+        const a = document.createElement("a"); a.href = v; a.target = "_blank"; a.rel = "noopener";
+        a.textContent = v.length > 50 ? v.slice(0, 47) + "..." : v; td.appendChild(a);
+      } else td.textContent = v;
+      tr.appendChild(td);
+    });
+    tb.appendChild(tr);
+  });
+  progress();
+}
+$("q").addEventListener("input", renderList);
+
+/* ---------- tên người dùng ---------- */
+function gate() {
+  $("gate").hidden = !!name; $("app").hidden = !name; $("who").textContent = name;
+  if (name) validate();
+}
+$("nmok").onclick = () => {
+  const v = $("nm").value.trim(); if (!v) return;
+  name = v; try { localStorage.setItem("nguoi_nhap", v); } catch (e) {}
+  gate(); renderList();
+};
+$("nm").addEventListener("keydown", e => { if (e.key === "Enter") $("nmok").click(); });
+$("chg").onclick = e => { e.preventDefault(); name = ""; try { localStorage.removeItem("nguoi_nhap"); } catch (er) {} $("nm").value = ""; gate(); };
+
+/* ---------- khởi động ---------- */
+for (let i = 0; i < CFG.MIN_ROWS; i++) addRow();
+gate(); load();
+setInterval(load, CFG.REFRESH_MS);
+window.addEventListener("focus", load);
+</script>
+</body>
+</html>
